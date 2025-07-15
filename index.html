@@ -691,7 +691,7 @@
             <div class="status-message" id="statusMessage"></div>
 
             <button class="start-btn" id="startBtn" onclick="generateDashboard()">
-                🚀 Começar Análise
+                �� Começar Análise
             </button>
         </div>
 
@@ -703,19 +703,19 @@
                 <div class="filters-grid">
                     <div class="filter-group">
                         <label for="estadoFilter">Estado:</label>
-                        <select id="estadoFilter" onchange="updateCharts()">
+                        <select id="estadoFilter" onchange="onEstadoChange()">
                             <option value="todos">Todos os Estados</option>
                         </select>
                     </div>
                     <div class="filter-group">
                         <label for="postoFilter">Posto:</label>
-                        <select id="postoFilter" onchange="updateCharts()">
+                        <select id="postoFilter" onchange="onPostoChange()">
                             <option value="todos">Todos os Postos</option>
                         </select>
                     </div>
                     <div class="filter-group">
                         <label for="aptidaoFilter">Aptidão:</label>
-                        <select id="aptidaoFilter" onchange="updateCharts()">
+                        <select id="aptidaoFilter" onchange="onAptidaoChange()">
                             <option value="todos">Todos</option>
                             <option value="apto">Aptos (≥ R\$ 100)</option>
                             <option value="nao_apto">Não Aptos (< R\$ 100)</option>
@@ -777,7 +777,7 @@
                 </div>
                 
                 <div class="chart-container">
-                    <div class="chart-title">📊 TOP 10 Frentistas - Desempenho Geral</div>
+                    <div class="chart-title">📊 TOP 10 Frentistas - Barras Horizontais</div>
                     <div id="barChart" style="height: 400px;"></div>
                 </div>
                 
@@ -837,8 +837,8 @@
             gradiente: ['#8B0000', '#A52A2A', '#CD5C5C', '#F08080', '#FFDB58']
         };
 
-        // Constante para critério de apti
-              const LIMITE_APTIDAO = 100.00;
+                // Constante para critério de aptidão
+        const LIMITE_APTIDAO = 100.00;
 
         // Função para manipular cliques nos cards
         function handleCardClick(tipo) {
@@ -891,6 +891,45 @@
         function hideFilterIndicator() {
             const indicator = document.getElementById('filterIndicator');
             indicator.classList.remove('show');
+        }
+
+        // Funções específicas para cada filtro
+        function onEstadoChange() {
+            console.log('Estado mudou para:', document.getElementById('estadoFilter').value);
+            atualizarFiltroPostos();
+            updateCharts();
+        }
+
+        function onPostoChange() {
+            console.log('Posto mudou para:', document.getElementById('postoFilter').value);
+            updateCharts();
+        }
+
+        function onAptidaoChange() {
+            console.log('Aptidão mudou para:', document.getElementById('aptidaoFilter').value);
+            const value = document.getElementById('aptidaoFilter').value;
+            
+            // Remover classes active de todos os cards
+            document.querySelectorAll('.summary-card').forEach(card => {
+                card.classList.remove('active');
+            });
+
+            // Atualizar estado baseado no filtro
+            if (value === 'apto') {
+                document.getElementById('cardTotalAptos').classList.add('active');
+                filtroAtivo = 'apto';
+                showFilterIndicator('Apenas Frentistas Aptos');
+            } else if (value === 'nao_apto') {
+                document.getElementById('cardTotalNaoAptos').classList.add('active');
+                filtroAtivo = 'nao_apto';
+                showFilterIndicator('Apenas Frentistas Não Aptos');
+            } else {
+                filtroAtivo = null;
+                hideFilterIndicator();
+            }
+            
+            atualizarFiltroPostos();
+            updateCharts();
         }
 
         // Função para baixar template Excel
@@ -1115,7 +1154,7 @@
                 if (!postosMap[f.posto]) {
                     postosMap[f.posto] = {
                         nome: f.posto,
-                        estado: f.estado, // Garante que o estado do posto é o do primeiro frentista encontrado
+                        estado: f.estado,
                         frentistas: 0,
                         frentistas_aptos: 0,
                         frentistas_nao_aptos: 0,
@@ -1231,23 +1270,39 @@
             atualizarFiltroPostos();
         }
 
-        // Atualizar filtro de postos
+        // Atualizar filtro de postos - CORRIGIDO
         function atualizarFiltroPostos() {
             const estadoSelecionado = document.getElementById('estadoFilter').value;
+            const aptidaoSelecionada = document.getElementById('aptidaoFilter').value;
             const postoSelect = document.getElementById('postoFilter');
             
+            console.log('Atualizando filtro de postos. Estado:', estadoSelecionado, 'Aptidão:', aptidaoSelecionada);
+            
+            // Limpar opções atuais
             postoSelect.innerHTML = '<option value="todos">Todos os Postos</option>';
             
-            // Obter lista de postos únicos dos dados filtrados (não dos dadosProcessados.postos)
-            // Isso garante que o filtro de posto só mostre postos relevantes para o estado selecionado
-            const postosUnicosFiltrados = new Set();
-            aplicarFiltrosSemPosto().forEach(frentista => {
-                postosUnicosFiltrados.add(frentista.posto);
-            });
-
-            const postosOrdenados = Array.from(postosUnicosFiltrados).sort();
-
-            postosOrdenados.forEach(posto => {
+            // Filtrar frentistas baseado nos filtros atuais (exceto posto)
+            let frentistasParaPostos = dadosProcessados.frentistas;
+            
+            if (estadoSelecionado !== 'todos') {
+                frentistasParaPostos = frentistasParaPostos.filter(f => f.estado === estadoSelecionado);
+            }
+            
+            if (aptidaoSelecionada !== 'todos') {
+                if (aptidaoSelecionada === 'apto') {
+                    frentistasParaPostos = frentistasParaPostos.filter(f => f.apto);
+                } else if (aptidaoSelecionada === 'nao_apto') {
+                    frentistasParaPostos = frentistasParaPostos.filter(f => !f.apto);
+                }
+            }
+            
+            // Extrair postos únicos dos frentistas filtrados
+            const postosUnicos = [...new Set(frentistasParaPostos.map(f => f.posto))].sort();
+            
+            console.log('Postos únicos encontrados:', postosUnicos);
+            
+            // Adicionar opções ao select
+            postosUnicos.forEach(posto => {
                 const option = document.createElement('option');
                 option.value = posto;
                 option.textContent = posto;
@@ -1300,11 +1355,10 @@
                 filtroAtivo = 'nao_apto';
                 showFilterIndicator('Apenas Frentistas Não Aptos');
             } else if (aptidaoFilter === 'todos') {
-                // Verifica se o filtro 'todos' foi ativado por um card ou por outro filtro
-                if (filtroAtivo === 'total') { // Se veio do card "Total Frentistas"
+                if (filtroAtivo === 'total') {
                     document.getElementById('cardTotalFrentistas').classList.add('active');
                     showFilterIndicator('Todos os Frentistas');
-                } else { // Se veio de outro filtro ou reset
+                } else {
                     hideFilterIndicator();
                     filtroAtivo = null;
                 }
@@ -1321,20 +1375,28 @@
             return num.toLocaleString('pt-BR');
         }
 
-        // Aplicar filtros aos dados
+        // Aplicar filtros aos dados - CORRIGIDO
         function aplicarFiltros() {
             const estadoSelecionado = document.getElementById('estadoFilter').value;
             const postoSelecionado = document.getElementById('postoFilter').value;
             const aptidaoSelecionada = document.getElementById('aptidaoFilter').value;
 
+            console.log('Aplicando filtros:', {
+                estado: estadoSelecionado,
+                posto: postoSelecionado,
+                aptidao: aptidaoSelecionada
+            });
+
             let dadosFiltrados = dadosProcessados.frentistas;
 
             if (estadoSelecionado !== 'todos') {
                 dadosFiltrados = dadosFiltrados.filter(f => f.estado === estadoSelecionado);
+                console.log('Após filtro estado:', dadosFiltrados.length);
             }
 
             if (postoSelecionado !== 'todos') {
                 dadosFiltrados = dadosFiltrados.filter(f => f.posto === postoSelecionado);
+                console.log('Após filtro posto:', dadosFiltrados.length);
             }
 
             if (aptidaoSelecionada !== 'todos') {
@@ -1343,30 +1405,9 @@
                 } else if (aptidaoSelecionada === 'nao_apto') {
                     dadosFiltrados = dadosFiltrados.filter(f => !f.apto);
                 }
+                console.log('Após filtro aptidão:', dadosFiltrados.length);
             }
 
-            return dadosFiltrados;
-        }
-
-        // Função auxiliar para aplicar filtros, mas ignorando o filtro de posto
-        // Usado para popular o dropdown de postos corretamente
-        function aplicarFiltrosSemPosto() {
-            const estadoSelecionado = document.getElementById('estadoFilter').value;
-            const aptidaoSelecionada = document.getElementById('aptidaoFilter').value;
-
-            let dadosFiltrados = dadosProcessados.frentistas;
-
-            if (estadoSelecionado !== 'todos') {
-                dadosFiltrados = dadosFiltrados.filter(f => f.estado === estadoSelecionado);
-            }
-
-            if (aptidaoSelecionada !== 'todos') {
-                if (aptidaoSelecionada === 'apto') {
-                    dadosFiltrados = dadosFiltrados.filter(f => f.apto);
-                } else if (aptidaoSelecionada === 'nao_apto') {
-                    dadosFiltrados = dadosFiltrados.filter(f => !f.apto);
-                }
-            }
             return dadosFiltrados;
         }
 
@@ -1384,7 +1425,7 @@
                 marker: {
                     colors: [cores.verde, cores.vermelho]
                 },
-                textinfo: 'label+percent+value', // Adicionado 'value' para mostrar o número
+                textinfo: 'label+percent+value',
                 textposition: 'outside',
                 hovertemplate: '<b>%{label}</b><br>Quantidade: %{value}<br>Percentual: %{percent}<extra></extra>'
             };
@@ -1399,7 +1440,7 @@
             Plotly.newPlot('pieChart', [trace], layout, {responsive: true});
         }
 
-        // Função para criar gráfico de barras
+        // Função para criar gráfico de barras HORIZONTAIS - CORRIGIDO
         function criarGraficoBarras() {
             const metricaSelecionada = document.getElementById('metricaFilter').value;
             const dadosFiltrados = aplicarFiltros();
@@ -1410,26 +1451,29 @@
                 .slice(0, 10);
             
             const trace = {
-                x: top10.map(f => f.nome),
-                y: top10.map(f => f[metricaSelecionada]),
+                // INVERTIDO: y são os nomes, x são os valores
+                y: top10.map(f => f.nome),
+                x: top10.map(f => f[metricaSelecionada]),
                 type: 'bar',
+                orientation: 'h', // HORIZONTAL
                 marker: {
                     color: top10.map(f => f.apto ? cores.verde : cores.vermelho),
                     line: {color: cores.primaria, width: 1}
                 },
-                text: top10.map(f => formatMetricValue(f[metricaSelecionada], metricaSelecionada)), // Adicionado rótulo de dados
-                textposition: 'auto', // Posição automática do rótulo
-                hovertemplate: '<b>%{x}</b><br>Valor: %{y:,.2f}<br>Status: ' + 
+                text: top10.map(f => formatMetricValue(f[metricaSelecionada], metricaSelecionada)),
+                textposition: 'auto',
+                hovertemplate: '<b>%{y}</b><br>Valor: %{x:,.2f}<br>Status: ' + 
                               top10.map(f => f.apto ? 'Apto' : 'Não Apto').join('<br>Status: ') + '<extra></extra>'
             };
 
             const layout = {
                 title: '',
-                xaxis: {title: 'Frentistas', tickangle: -45},
-                yaxis: {title: getMetricaLabel(metricaSelecionada)},
+                xaxis: {title: getMetricaLabel(metricaSelecionada)},
+                yaxis: {title: 'Frentistas', automargin: true}, // automargin para nomes longos
                 plot_bgcolor: cores.branco,
                 paper_bgcolor: cores.branco,
-                font: { family: 'Arial', size: 12 }
+                font: { family: 'Arial', size: 12 },
+                margin: { l: 150, r: 50, t: 50, b: 50 } // Margem esquerda maior para nomes
             };
 
             Plotly.newPlot('barChart', [trace], layout, {responsive: true});
@@ -1450,7 +1494,7 @@
                 type: 'bar',
                 name: 'Frentistas Aptos',
                 marker: {color: cores.verde},
-                text: dadosEstados.map(e => e.frentistas_aptos), // Adicionado rótulo de dados
+                text: dadosEstados.map(e => e.frentistas_aptos),
                 textposition: 'auto',
                 hovertemplate: '<b>%{x}</b><br>Aptos: %{y}<extra></extra>'
             };
@@ -1461,7 +1505,7 @@
                 type: 'bar',
                 name: 'Frentistas Não Aptos',
                 marker: {color: cores.vermelho},
-                text: dadosEstados.map(e => e.frentistas_nao_aptos), // Adicionado rótulo de dados
+                text: dadosEstados.map(e => e.frentistas_nao_aptos),
                 textposition: 'auto',
                 hovertemplate: '<b>%{x}</b><br>Não Aptos: %{y}<extra></extra>'
             };
@@ -1494,7 +1538,7 @@
                     color: dadosFiltrados.map(f => f.apto ? cores.verde : cores.vermelho),
                     line: {color: cores.primaria, width: 1}
                 },
-                hovertemplate: '<b>%{text}</b><br>Volume: %{x:,.0f}L<br>Comissão: R\$ %{y:,.2f}<br>Status: ' +
+                                hovertemplate: '<b>%{text}</b><br>Volume: %{x:,.0f}L<br>Comissão: R\$ %{y:,.2f}<br>Status: ' +
                               dadosFiltrados.map(f => f.apto ? 'Apto' : 'Não Apto').join('<br>Status: ') + '<extra></extra>'
             };
 
@@ -1621,10 +1665,8 @@
         function updateCharts() {
             if (!dadosProcessados.frentistas.length) return;
             
-            // Atualiza o filtro de postos ANTES de aplicar os filtros para os gráficos
-            // Isso garante que o dropdown de postos reflita o estado e aptidão selecionados
-            atualizarFiltroPostos(); 
-
+            console.log('Atualizando gráficos...');
+            
             atualizarResumo();
             criarGraficoPizza();
             criarGraficoBarras();
@@ -1669,7 +1711,7 @@
 
             // Evento de clique no gráfico de barras
             document.getElementById('barChart').on('plotly_click', function(data) {
-                const frentista = data.points[0].x;
+                const frentista = data.points[0].y; // Mudou de x para y (barras horizontais)
                 const dadosFrentista = dadosProcessados.frentistas.find(f => f.nome === frentista);
                 if (dadosFrentista) {
                     const statusAptidao = dadosFrentista.apto ? 'APTO' : 'NÃO APTO';
@@ -1682,7 +1724,7 @@
                           `⛽ Volume: ${dadosFrentista.volume.toLocaleString()} L\n` +
                           `👥 Clientes: ${dadosFrentista.clientes}\n` +
                           `🔄 Recorrência: ${(dadosFrentista.recorrencia * 100).toFixed(1)}%\n` +
-                          `💰 Comissão Total: R\$ ${dadosFrentista.comissao_total.toLocaleString('pt-BR', {minimumFractionDigits: 2})}\n\n` +
+                          `�� Comissão Total: R\$ ${dadosFrentista.comissao_total.toLocaleString('pt-BR', {minimumFractionDigits: 2})}\n\n` +
                           `${dadosFrentista.apto ? '✅ Qualificado para bonificação' : '❌ Não qualificado para bonificação'}`);
                 }
             });
@@ -1691,7 +1733,7 @@
             document.getElementById('postosChart').on('plotly_click', function(data) {
                 const estado = data.points[0].x;
                 document.getElementById('estadoFilter').value = estado;
-                updateCharts();
+                onEstadoChange();
             });
 
             // Evento de clique no gráfico de dispersão
@@ -1705,11 +1747,11 @@
                     const statusColor = frentista.apto ? '🟢' : '🔴';
                     
                     alert(`${statusColor} Análise detalhada: ${frentista.nome}\n\n` +
-                          `📊 Status: ${statusAptidao}\n` +
-                          `📍 Estado: ${frentista.estado}\n` +
-                          `🏪 Posto: ${frentista.posto}\n` +
+                          `�� Status: ${statusAptidao}\n` +
+                          `�� Estado: ${frentista.estado}\n` +
+                          `�� Posto: ${frentista.posto}\n` +
                           `⛽ Volume: ${frentista.volume.toLocaleString()} L\n` +
-                          `👥 Clientes: ${frentista.clientes}\n` +
+                          `�� Clientes: ${frentista.clientes}\n` +
                           `🔄 Recorrência: ${(frentista.recorrencia * 100).toFixed(1)}%\n` +
                           `💰 Comissão Total: R\$ ${frentista.comissao_total.toLocaleString('pt-BR', {minimumFractionDigits: 2})}\n\n` +
                           `📈 Posição no gráfico:\n` +
@@ -1717,57 +1759,6 @@
                           `   Y (Comissão): R\$ ${frentista.comissao_total.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`);
                 }
             });
-        }
-
-        // Função para detectar mudanças nos filtros dropdown
-        function setupFilterListeners() {
-            // Listener para filtro de aptidão
-            document.getElementById('aptidaoFilter').addEventListener('change', function() {
-                const value = this.value;
-                
-                // Remover classes active de todos os cards
-                document.querySelectorAll('.summary-card').forEach(card => {
-                    card.classList.remove('active');
-                });
-
-                // Atualizar estado baseado no filtro
-                if (value === 'apto') {
-                    document.getElementById('cardTotalAptos').classList.add('active');
-                    filtroAtivo = 'apto';
-                    showFilterIndicator('Apenas Frentistas Aptos');
-                } else if (value === 'nao_apto') {
-                    document.getElementById('cardTotalNaoAptos').classList.add('active');
-                    filtroAtivo = 'nao_apto';
-                    showFilterIndicator('Apenas Frentistas Não Aptos');
-                } else {
-                    filtroAtivo = null;
-                    hideFilterIndicator();
-                }
-                updateCharts(); // Chamar updateCharts após a mudança
-            });
-
-            // Listener para outros filtros
-            document.getElementById('estadoFilter').addEventListener('change', function() {
-                const value = this.value;
-                if (value !== 'todos') {
-                    showFilterIndicator(`Estado: ${value}`);
-                } else if (filtroAtivo === null) {
-                    hideFilterIndicator();
-                }
-                updateCharts(); // Chamar updateCharts após a mudança
-            });
-
-            document.getElementById('postoFilter').addEventListener('change', function() {
-                const value = this.value;
-                if (value !== 'todos') {
-                    showFilterIndicator(`Posto: ${value}`);
-                } else if (filtroAtivo === null && document.getElementById('estadoFilter').value === 'todos') {
-                    hideFilterIndicator();
-                }
-                updateCharts(); // Chamar updateCharts após a mudança
-            });
-
-            document.getElementById('metricaFilter').addEventListener('change', updateCharts); // Chamar updateCharts após a mudança
         }
 
         // Função para adicionar efeitos visuais aos cards
@@ -1853,12 +1844,10 @@
         // Inicialização
         document.addEventListener('DOMContentLoaded', function() {
             setupDragAndDrop();
-            setupFilterListeners();
             setupCardEffects();
             setupTooltips();
             
             // Adicionar interatividade após um delay para garantir que os gráficos foram criados
-            // Isso só é necessário se houver dados pré-carregados. Com importação, não é crítico aqui.
             setTimeout(() => {
                 if (dadosProcessados.frentistas.length > 0) {
                     adicionarInteratividade();
